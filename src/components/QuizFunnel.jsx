@@ -12,7 +12,7 @@ import Badges from '@/components/Badges';
 import { supabase } from '@/lib/customSupabaseClient';
 
 // ----------------- Webhook helper -----------------
-const sendLeadWebhook = async (leadData, eventId) => {
+const sendLeadWebhook = async (leadData, eventId, fbclid) => {
   const webhookSent = sessionStorage.getItem('webhookSent');
   if (webhookSent === 'true') {
     console.log('Webhook already sent for this session. Skipping.');
@@ -52,7 +52,8 @@ const sendLeadWebhook = async (leadData, eventId) => {
     } = await supabase.functions.invoke('send-facebook-lead-high-life', {
       body: {
         leadData,
-        event_id: eventId
+        event_id: eventId,
+        fbclid
       }
     });
     if (fbError) {
@@ -83,10 +84,24 @@ const QuizFunnel = () => {
     name: '',
     phone: ''
   });
+  const [fbclid, setFbclid] = useState(null);
 
   useEffect(() => {
     // Clear webhook session storage on first load
     sessionStorage.removeItem('webhookSent');
+
+    // Capture fbclid from URL for Facebook CAPI click matching
+    const params = new URLSearchParams(window.location.search);
+    const clickId = params.get('fbclid');
+    if (clickId) {
+      setFbclid(clickId);
+      // Also store in sessionStorage in case of page navigation
+      sessionStorage.setItem('fbclid', clickId);
+    } else {
+      // Check sessionStorage for previously captured fbclid
+      const stored = sessionStorage.getItem('fbclid');
+      if (stored) setFbclid(stored);
+    }
   }, []);
 
   const totalSteps = 5;
@@ -127,8 +142,8 @@ const QuizFunnel = () => {
       const { error: dbError } = await supabase.from('leads').insert([leadData]);
       if (dbError) throw dbError;
 
-      // 2. Send Webhook & CAPI
-      await sendLeadWebhook(leadData, eventId);
+      // 2. Send Webhook & CAPI (include fbclid for click matching)
+      await sendLeadWebhook(leadData, eventId, fbclid);
 
       // 3. Track Client-side Pixel
       if (window.fbq) {

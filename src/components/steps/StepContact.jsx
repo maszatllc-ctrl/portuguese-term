@@ -70,7 +70,11 @@ const StepContact = ({
 
   const handlePhoneChange = e => {
     const raw = e.target.value || '';
-    const digitsOnly = extractDigits(raw);
+    let digitsOnly = extractDigits(raw);
+    // Strip leading country code "1" from autofilled numbers like +1XXXXXXXXXX
+    if (digitsOnly.startsWith('1') && digitsOnly.length > 10) {
+      digitsOnly = digitsOnly.slice(1);
+    }
     const maxLen = getMaxDigitsForCountry();
     setPhoneDigits(digitsOnly.slice(0, maxLen));
   };
